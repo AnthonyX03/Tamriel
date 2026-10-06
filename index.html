@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0806">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tamriel">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Tamriel — Daggerfall</title>
+<style>
+:root{--bg:#0a0806;--panel:#16120c;--line:#c9a227;--txt:#e8d5a3;--muted:#9a8058;--gold:#ffd700;--danger:#a02828;--hp:#2e8b3a;--mag:#3a6aaa}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--txt);font-family:Georgia,Palatino,serif;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-text-size-adjust:100%}
+#app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
+#viewport{flex:1 1 auto;min-height:0;position:relative;background:#000;overflow:hidden}
+.fp-scene{position:absolute;inset:0}
+.fp-ceil{position:absolute;left:0;right:0;top:0;height:36%;background:#1a1612 center/cover}
+.fp-floor{position:absolute;left:0;right:0;bottom:0;height:44%;background:#2a2218 center/cover}
+.fp-wall-L,.fp-wall-R{position:absolute;top:0;bottom:0;width:40%;background:center/cover}
+.fp-wall-L{left:0;clip-path:polygon(0 0,100% 16%,100% 84%,0 100%)}
+.fp-wall-R{right:0;clip-path:polygon(0 16%,100% 0,100% 100%,0 84%)}
+.fp-front{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:center/cover;box-shadow:inset 0 0 40px rgba(0,0,0,.55)}
+.fp-front.d1{width:56%;height:50%;z-index:3}
+.fp-front.d2{width:36%;height:34%;z-index:2;opacity:.95}
+.fp-front.d3{width:22%;height:22%;z-index:1;opacity:.85}
+.fp-front.open{background:linear-gradient(180deg,#15120e,#0a0806 50%,#15120e)!important;box-shadow:inset 0 0 50px #000}
+.fp-side-L,.fp-side-R{position:absolute;top:20%;height:58%;width:16%;background:linear-gradient(180deg,#12100c,#080604);z-index:2}
+.fp-side-L{left:6%;clip-path:polygon(0 0,100% 10%,100% 90%,0 100%)}
+.fp-side-R{right:6%;clip-path:polygon(0 10%,100% 0,100% 100%,0 90%)}
+.fp-enemy{position:absolute;left:50%;bottom:26%;transform:translateX(-50%);z-index:10;image-rendering:auto;filter:drop-shadow(0 4px 8px #000c);pointer-events:none;transition:transform .12s,filter .12s}
+.fp-enemy.near{height:40%;max-height:210px}
+.fp-enemy.mid{height:26%;max-height:130px;opacity:.95}
+.fp-enemy.far{height:14%;max-height:70px;opacity:.85}
+.fp-enemy.hit{transform:translateX(-50%) scale(1.06);filter:brightness(1.5) drop-shadow(0 0 14px #a02828)}
+.fp-loot{position:absolute;left:50%;bottom:30%;transform:translateX(-50%);z-index:9;height:12%;max-height:48px;image-rendering:pixelated;filter:drop-shadow(0 2px 4px #000);pointer-events:none}
+.fp-weapon{position:absolute;right:2%;bottom:6%;height:44%;max-height:230px;z-index:15;transform-origin:70% 95%;transition:transform .1s;pointer-events:none;filter:drop-shadow(0 2px 6px #000a)}
+.fp-weapon.swing{transform:rotate(-28deg) translateY(-10%)}
+.fp-vig{position:absolute;inset:0;z-index:12;pointer-events:none;background:radial-gradient(ellipse at center,transparent 42%,#0009 100%)}
+.fp-msg{position:absolute;left:50%;top:10%;transform:translateX(-50%);z-index:20;background:#0a0806e0;border:1px solid #5a4520;padding:5px 12px;border-radius:3px;font-size:12px;color:var(--gold);opacity:0;transition:opacity .25s;text-align:center;max-width:90%;pointer-events:none}
+.fp-msg.show{opacity:1}
+.fp-loc{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:18;font-size:10px;color:var(--muted);background:#0008;padding:2px 8px;border-radius:2px;white-space:nowrap}
+.fp-compass{position:absolute;top:4px;right:6px;z-index:18;font-size:10px;color:var(--muted);background:#0008;padding:2px 6px;border-radius:2px}
+#hud{flex-shrink:0;background:linear-gradient(180deg,#1c1610,#100c08);border-top:2px solid #5a4520;padding:5px 5px 7px}
+.logline{font-size:10px;color:var(--muted);text-align:center;min-height:13px;margin-bottom:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.hud-top{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.portrait{width:44px;height:44px;border:2px solid #c9a227;border-radius:2px;flex-shrink:0}
+.bars{flex:1;display:flex;flex-direction:column;gap:2px}
+.bar-row{display:flex;align-items:center;gap:3px;font-size:9px}
+.bar-track{flex:1;height:10px;background:#0c0a06;border:1px solid #3a2a1a;border-radius:1px;overflow:hidden}
+.bar-fill{height:100%;transition:width .2s}
+.bar-fill.hp{background:linear-gradient(90deg,#1a4a22,#2e8b3a)}
+.bar-fill.mag{background:linear-gradient(90deg,#1a2a5a,#3a6aaa)}
+.bar-fill.stam{background:linear-gradient(90deg,#5a4a1a,#a08a2a)}
+.meta{font-size:9px;color:var(--muted);text-align:right;line-height:1.35}
+.meta .g{color:var(--gold)}
+.controls{display:grid;grid-template-columns:1fr auto 1fr;gap:3px;align-items:center}
+.pad{display:grid;grid-template-areas:". u ." "l m r" ". d .";grid-template-columns:42px 42px 42px;grid-template-rows:34px 34px 34px;gap:2px;justify-self:center}
+.pad button{background:#2a2015;border:1px solid #6b5428;color:var(--txt);font-size:15px;border-radius:4px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.pad button:active{background:var(--line);color:#1a120b}
+.pad .u{grid-area:u}.pad .d{grid-area:d}.pad .l{grid-area:l}.pad .r{grid-area:r}.pad .m{grid-area:m;font-size:9px}
+.side{display:flex;flex-direction:column;gap:3px}
+.side button{background:#2a2015;border:1px solid #5a4520;color:var(--txt);font-family:inherit;font-size:10px;padding:7px 4px;border-radius:3px;cursor:pointer;min-width:58px}
+.side button:active{background:#3a3020}
+.side button.atk{border-color:var(--danger);color:#e8a0a0;font-weight:bold}
+.side button:disabled{opacity:.35}
+#panel{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;background:var(--panel);padding:8px;border-top:1px solid #5a4520;-webkit-overflow-scrolling:touch}
+#panel.open{display:block}
+#viewport.hid{display:none}
+.tabs{display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap}
+.tabs button{background:#2a2015;border:1px solid #5a4520;color:var(--txt);font-family:inherit;font-size:10px;padding:6px 8px;border-radius:2px;cursor:pointer}
+.tabs button.on{background:var(--line);color:#1a120b;font-weight:bold}
+.item{display:flex;align-items:center;gap:6px;padding:6px 3px;border-bottom:1px solid #2a2015;font-size:12px}
+.item .n{flex:1}.item .m{color:var(--muted);font-size:10px;white-space:nowrap}
+.item button{font-size:10px;padding:4px 7px;background:#2a2015;border:1px solid #5a4520;color:var(--txt);border-radius:2px;font-family:inherit;cursor:pointer}
+.item button.eq{border-color:var(--line);color:var(--gold)}
+.slot{font-size:11px;color:var(--muted);margin:4px 0 2px;border-bottom:1px solid #3a2a1a;padding-bottom:2px}
+.qcard{background:#120e0a;border:1px solid #5a4520;border-radius:4px;padding:8px;margin-bottom:6px}
+.qcard h4{color:var(--gold);font-size:12px;margin-bottom:2px}.qcard p{font-size:11px;color:var(--muted)}
+.modal-bg{position:fixed;inset:0;background:#000d;display:flex;align-items:center;justify-content:center;z-index:100;padding:14px}
+.modal{background:#1a140e;border:2px solid #c9a227;border-radius:6px;padding:14px;max-width:360px;width:100%;max-height:82vh;overflow-y:auto}
+.modal h3{color:var(--gold);text-align:center;margin-bottom:10px;font-size:15px}
+.modal button{width:100%;margin:3px 0;padding:10px;font-family:inherit;font-size:13px;background:#2a2015;border:1px solid #5a4520;color:var(--txt);border-radius:3px;cursor:pointer}
+.modal button.danger{border-color:var(--danger);color:#e8a0a0}
+.modal button.gold{border-color:var(--gold);color:var(--gold)}
+.hidden{display:none!important}.small{font-size:11px;color:var(--muted)}.center{text-align:center}
+.shop-row{display:flex;justify-content:space-between;align-items:center;padding:6px 2px;border-bottom:1px solid #2a2015;font-size:12px;gap:4px}
+.shop-row button{font-size:10px;padding:4px 8px;background:#2a2015;border:1px solid #6b5428;color:var(--txt);border-radius:2px;font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="viewport">
+<div class="fp-scene" id="scene">
+<div class="fp-ceil" id="ceil"></div>
+<div class="fp-floor" id="floor"></div>
+<div class="fp-wall-L" id="wallL"></div>
+<div class="fp-wall-R" id="wallR"></div>
+<div class="fp-front d1" id="front1"></div>
+<div class="fp-front d2 hidden" id="front2"></div>
+<div class="fp-front d3 hidden" id="front3"></div>
+<div class="fp-side-L hidden" id="sideL"></div>
+<div class="fp-side-R hidden" id="sideR"></div>
+<img class="fp-enemy hidden" id="enemyImg" alt="">
+<img class="fp-loot hidden" id="lootImg" src="assets/chest.png" alt="">
+<img class="fp-weapon" id="weaponImg" src="assets/sword.png" alt="">
+<div class="fp-vig"></div>
+<div class="fp-loc" id="locLabel">—</div>
+<div class="fp-compass" id="compass">N</div>
+<div class="fp-msg" id="fpMsg"></div>
+</div>
+</div>
+<div id="panel"></div>
+<div id="hud">
+<div class="logline" id="logline">Tamriel te espera, Sangre de Dragón.</div>
+<div class="hud-top">
+<img class="portrait" src="assets/portrait.png" alt="">
+<div class="bars">
+<div class="bar-row">❤<div class="bar-track"><div class="bar-fill hp" id="barHp" style="width:100%"></div></div></div>
+<div class="bar-row">✦<div class="bar-track"><div class="bar-fill mag" id="barMag" style="width:100%"></div></div></div>
+<div class="bar-row">⚡<div class="bar-track"><div class="bar-fill stam" id="barStam" style="width:100%"></div></div></div>
+</div>
+<div class="meta"><div>Nv <span id="stLvl">1</span></div><div class="g">🪙<span id="stGold">75</span></div><div><span id="stWt">0</span>/<span id="stMaxWt">150</span></div></div>
+</div>
+<div class="controls">
+<div class="side">
+<button class="atk" id="btnAtk" onclick="doAttack()">Atacar</button>
+<button id="btnShout" onclick="doShout()">Grito</button>
+<button id="btnLoot" onclick="doLoot()">Botín</button>
+<button onclick="openPanel('inv')">Inv.</button>
+</div>
+<div class="pad">
+<button class="u" onclick="moveFwd()">▲</button>
+<button class="l" onclick="turnL()">◀</button>
+<button class="m" onclick="openPanel('travel')">MAP</button>
+<button class="r" onclick="turnR()">▶</button>
+<button class="d" onclick="moveBack()">▼</button>
+</div>
+<div class="side">
+<button onclick="openPanel('char')">Pers.</button>
+<button onclick="openPanel('quests')">Misión</button>
+<button onclick="tryShop()">Tienda</button>
+<button onclick="openSettings()">⚙</button>
+</div>
+</div>
+</div>
+</div>
+<div id="modal" class="modal-bg hidden" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalContent"></div></div>
+<script>
+/* ================================================================
+   TAMRIEL — Estilo Daggerfall: exterior, ciudades, botín, comercio
+   ================================================================ */
+const DIR={N:0,E:1,S:2,W:3},DX=[0,1,0,-1],DY=[-1,0,1,0],DN=['N','E','S','O'];
+const WPN_IMG={1:'assets/sword.png',2:'assets/sword.png',3:'assets/sword.png',4:'assets/sword.png',5:'assets/sword.png',6:'assets/weapon_axe.png',7:'assets/weapon_axe.png',8:'assets/weapon_bow.png',9:'assets/weapon_bow.png',10:'assets/weapon_staff.png',11:'assets/weapon_staff.png'};
+
+const ITEMS=[
+{id:1,name:"Daga de hierro",type:"weapon",slot:"weapon",dmg:6,weight:1.5,value:15},
+{id:2,name:"Espada corta de hierro",type:"weapon",slot:"weapon",dmg:9,weight:7,value:35},
+{id:3,name:"Espada larga de acero",type:"weapon",slot:"weapon",dmg:14,weight:12,value:90},
+{id:4,name:"Espada élfica",type:"weapon",slot:"weapon",dmg:18,weight:9,value:250},
+{id:5,name:"Espada daédrica",type:"weapon",slot:"weapon",dmg:28,weight:16,value:1400},
+{id:6,name:"Hacha de guerra",type:"weapon",slot:"weapon",dmg:16,weight:18,value:120},
+{id:7,name:"Hacha orca",type:"weapon",slot:"weapon",dmg:22,weight:22,value:320},
+{id:8,name:"Arco de caza",type:"weapon",slot:"weapon",dmg:8,weight:6,value:40},
+{id:9,name:"Arco élfico",type:"weapon",slot:"weapon",dmg:15,weight:8,value:200},
+{id:10,name:"Bastón de roble",type:"weapon",slot:"weapon",dmg:5,weight:5,value:50,magBonus:10},
+{id:11,name:"Bastón de mago",type:"weapon",slot:"weapon",dmg:7,weight:6,value:180,magBonus:25},
+{id:20,name:"Ropa de campesino",type:"armor",slot:"chest",def:1,weight:1,value:5},
+{id:21,name:"Armadura de cuero",type:"armor",slot:"chest",def:10,weight:6,value:55},
+{id:22,name:"Cota de hierro",type:"armor",slot:"chest",def:18,weight:22,value:140},
+{id:23,name:"Armadura de acero",type:"armor",slot:"chest",def:26,weight:28,value:280},
+{id:24,name:"Armadura élfica",type:"armor",slot:"chest",def:30,weight:16,value:550},
+{id:25,name:"Armadura daédrica",type:"armor",slot:"chest",def:45,weight:40,value:2200},
+{id:26,name:"Yelmo de hierro",type:"armor",slot:"head",def:5,weight:4,value:40},
+{id:27,name:"Yelmo de acero",type:"armor",slot:"head",def:8,weight:5,value:80},
+{id:28,name:"Botas de cuero",type:"armor",slot:"feet",def:3,weight:2,value:25},
+{id:29,name:"Botas de acero",type:"armor",slot:"feet",def:6,weight:6,value:70},
+{id:30,name:"Escudo de madera",type:"armor",slot:"shield",def:4,weight:5,value:30},
+{id:31,name:"Escudo de hierro",type:"armor",slot:"shield",def:8,weight:10,value:75},
+{id:32,name:"Túnica de mago",type:"armor",slot:"chest",def:4,weight:2,value:80,magBonus:20},
+{id:40,name:"Poción de salud menor",type:"potion",heal:25,weight:0.3,value:20,stack:true},
+{id:41,name:"Poción de salud",type:"potion",heal:50,weight:0.4,value:45,stack:true},
+{id:42,name:"Poción de salud fuerte",type:"potion",heal:90,weight:0.5,value:95,stack:true},
+{id:43,name:"Poción de magia",type:"potion",mag:35,weight:0.3,value:35,stack:true},
+{id:44,name:"Poción de aguante",type:"potion",stam:40,weight:0.3,value:30,stack:true},
+{id:45,name:"Pan",type:"food",heal:8,weight:0.2,value:2,stack:true},
+{id:46,name:"Queso",type:"food",heal:12,weight:0.3,value:5,stack:true},
+{id:47,name:"Carne asada",type:"food",heal:20,weight:0.5,value:12,stack:true},
+{id:48,name:"Hidromiel",type:"food",heal:12,stam:15,weight:0.4,value:15,stack:true},
+{id:50,name:"Gema de alma menor",type:"misc",weight:0.2,value:40,stack:true},
+{id:51,name:"Gema de alma",type:"misc",weight:0.3,value:90,stack:true},
+{id:52,name:"Lingote de hierro",type:"misc",weight:1,value:12,stack:true},
+{id:53,name:"Lingote de acero",type:"misc",weight:1,value:30,stack:true},
+{id:54,name:"Piel de lobo",type:"misc",weight:1.5,value:15,stack:true},
+{id:55,name:"Hueso antiguo",type:"misc",weight:0.5,value:8,stack:true},
+{id:56,name:"Polvo de vampiro",type:"misc",weight:0.1,value:60,stack:true},
+{id:57,name:"Flor de montaña",type:"misc",weight:0.1,value:5,stack:true},
+{id:58,name:"Anillo de plata",type:"armor",slot:"ring",def:0,weight:0.1,value:100,magBonus:5},
+{id:59,name:"Amuleto de Talos",type:"armor",slot:"amulet",def:0,weight:0.2,value:150,magBonus:10},
+];
+
+const EDEF={
+bat:{name:"Murciélago",hp:16,dmg:3,xp:6,gold:[0,3],loot:[[40,.2],[55,.15]],img:"assets/enemy_bat.png",tags:["beast"]},
+rat:{name:"Rata gigante",hp:20,dmg:4,xp:8,gold:[0,4],loot:[[45,.3],[40,.15]],img:"assets/enemy_rat.png",tags:["beast"]},
+skel:{name:"Esqueleto",hp:38,dmg:8,xp:16,gold:[4,16],loot:[[55,.4],[1,.2],[40,.25]],img:"assets/enemy_skel.png",tags:["undead"]},
+draugr:{name:"Draugr",hp:60,dmg:13,xp:30,gold:[12,35],loot:[[55,.3],[3,.15],[41,.2],[50,.15]],img:"assets/enemy_draugr.png",tags:["undead"]},
+wolf:{name:"Lobo",hp:32,dmg:9,xp:14,gold:[0,5],loot:[[54,.6],[47,.3]],img:"assets/enemy_wolf.png",tags:["beast"]},
+spider:{name:"Araña gigante",hp:28,dmg:7,xp:12,gold:[0,6],loot:[[40,.25],[57,.3]],img:"assets/enemy_spider.png",tags:["beast"]},
+bandit:{name:"Bandido",hp:45,dmg:10,xp:20,gold:[8,28],loot:[[2,.25],[21,.2],[40,.3],[45,.4]],img:"assets/enemy_bandit.png",tags:["human"]},
+giant:{name:"Gigante",hp:160,dmg:22,xp:70,gold:[30,80],loot:[[6,.3],[23,.15],[47,.5]],img:"assets/enemy_giant.png",tags:["giant"]},
+atronach:{name:"Atronach de fuego",hp:55,dmg:12,xp:28,gold:[0,0],loot:[[50,.5],[43,.4]],img:"assets/enemy_atronach.png",tags:["daedra"]},
+spriggan:{name:"Spriggan",hp:48,dmg:11,xp:24,gold:[5,20],loot:[[57,.5],[41,.2],[50,.2]],img:"assets/enemy_spriggan.png",tags:["nature"]},
+};
+
+/* Maps: 0 empty, 1 wall, 2 exit/door, 3 shop, 4 chest, 5 town exit to wilderness */
+function solid(v){return v===1;}
+const MAPS={};
+
+// Helper to build maps
+function buildMap(name,type,theme,rows,start,exit,enemies,chests,shopAt){
+  const h=rows.length,w=rows[0].length;
+  const data=rows.map(r=>r.split('').map(c=>{
+    if(c==='#')return 1; if(c=='.')return 0; if(c=='D')return 2; if(c=='S')return 3;
+    if(c=='C')return 4; if(c=='X')return 5; return 0;
+  }));
+  return {name,type,theme,w,h,data,start,exit,enemies:enemies||[],chests:chests||[],shopAt:shopAt||null};
+}
+
+MAPS.bleakfalls=buildMap("Bleak Falls Barrow","dungeon","dungeon",[
+"###############",
+"#...#.....#...#",
+"#.#.#.###.#.#.#",
+"#.#.......#.#.#",
+"#.#####.#.#.#.#",
+"#.....#.......#",
+"###.#.#####.###",
+"#...#.....#...#",
+"#.#####.#.#.###",
+"#.......#.....#",
+"###.#####.###.#",
+"#...#.........#",
+"#.#####.#####.#",
+"#...........C.D",
+"###############"
+],{x:1,y:1,dir:1},{x:13,y:13},
+[{x:3,y:1,t:'rat'},{x:7,y:3,t:'bat'},{x:5,y:5,t:'skel'},{x:9,y:7,t:'bat'},{x:3,y:9,t:'skel'},{x:11,y:9,t:'draugr'},{x:7,y:11,t:'skel'},{x:11,y:13,t:'draugr'}],
+[{x:12,y:13,loot:[[3,.5],[41,.6],[50,.4],[52,.5]]}]);
+
+MAPS.crypt=buildMap("Cripta de los Ancestros","dungeon","crypt",[
+"#############",
+"#.....#.....#",
+"#.###.#.###.#",
+"#.#.......#.#",
+"#.#.#####.#.#",
+"#.....#.....#",
+"###.#.#.#.###",
+"#...#...#...#",
+"#.#####.###.#",
+"#.....#....C#",
+"###.#.#.#####",
+"#...#.......D",
+"#############"
+],{x:1,y:1,dir:1},{x:11,y:11},
+[{x:5,y:1,t:'skel'},{x:9,y:3,t:'bat'},{x:3,y:5,t:'skel'},{x:7,y:5,t:'draugr'},{x:1,y:7,t:'skel'},{x:9,y:7,t:'draugr'},{x:5,y:9,t:'atronach'}],
+[{x:10,y:9,loot:[[5,.15],[27,.3],[51,.4],[55,.5],[42,.3]]}]);
+
+MAPS.forest_cave=buildMap("Cueva del Bosque","dungeon","dungeon",[
+"###########",
+"#.....#...#",
+"#.###.#.#.#",
+"#.#.......#",
+"#.#.#####.#",
+"#.........#",
+"###.#.#####",
+"#...#.....#",
+"#.#####.#.#",
+"#.......#.D",
+"###########"
+],{x:1,y:1,dir:1},{x:9,y:9},
+[{x:3,y:1,t:'spider'},{x:7,y:1,t:'rat'},{x:5,y:3,t:'spider'},{x:1,y:5,t:'spriggan'},{x:7,y:5,t:'wolf'},{x:5,y:7,t:'spriggan'}],
+[{x:7,y:9,loot:[[57,.7],[41,.4],[54,.3]]}]);
+
+MAPS.wilderness=buildMap("Tierras de Whiterun","wild","wild",[
+"####################",
+"#..................#",
+"#..##....##....##..#",
+"#..##....##....##..#",
+"#..................#",
+"#....####..........#",
+"#....####...##.....#",
+"#...........##.....#",
+"#..##..............#",
+"#..##....####......#",
+"#........####...X..#",
+"#..................#",
+"#....##......##....#",
+"#....##......##....#",
+"#..................D",
+"####################"
+],{x:1,y:1,dir:1},{x:18,y:14},
+[{x:5,y:2,t:'wolf'},{x:12,y:2,t:'wolf'},{x:8,y:6,t:'bandit'},{x:3,y:8,t:'spider'},{x:14,y:8,t:'bandit'},{x:10,y:11,t:'spriggan'},{x:6,y:13,t:'wolf'},{x:15,y:4,t:'giant'}],
+[{x:9,y:10,loot:[[54,.5],[47,.4],[40,.3]]}]);
+
+// Town - open streets
+MAPS.whiterun=buildMap("Whiterun — Plaza","town","town",[
+"###############",
+"#.............#",
+"#.##.#S#.##.#.#",
+"#.............#",
+"#.#.#####.#.#.#",
+"#.............#",
+"#.##.....##.#.#",
+"#.............#",
+"#.#.#####.#.#.#",
+"#............C#",
+"#.##.....##.#.#",
+"#.............#",
+"#......X......#",
+"###############"
+],{x:7,y:12,dir:0},{x:7,y:12},
+[],[{x:12,y:9,loot:[[45,.8],[46,.5],[40,.3]]}],
+{x:6,y:2});
+
+MAPS.riften=buildMap("Riften — Mercado","town","town",[
+"#############",
+"#...........#",
+"#.#S#...#.#.#",
+"#...........#",
+"#.###...###.#",
+"#...........#",
+"#.#.......#.#",
+"#...........#",
+"#.###.X.###.#",
+"#...........#",
+"#.........C.#",
+"#...........D",
+"#############"
+],{x:6,y:8,dir:0},{x:11,y:11},
+[{x:9,y:4,t:'bandit'}],
+[{x:9,y:10,loot:[[2,.3],[40,.4]]}],
+{x:3,y:2});
+
+const THEMES={
+dungeon:{wall:'assets/wall_dungeon.png',floor:'assets/floor_stone.png',ceil:'assets/ceil_dark.png',sky:null},
+crypt:{wall:'assets/wall_crypt.png',floor:'assets/floor_stone.png',ceil:'assets/ceil_dark.png',sky:null},
+town:{wall:'assets/wall_town.png',floor:'assets/floor_wood.png',ceil:'assets/wall_plaster.png',sky:'assets/sky_day.png'},
+wild:{wall:'assets/wall_forest.png',floor:'assets/floor_grass.png',ceil:null,sky:'assets/sky_day.png'},
+};
+
+const SHOPS={
+whiterun:[1,2,3,6,8,10,20,21,22,26,28,30,32,40,41,43,44,45,46,47,48,52,57],
+riften:[1,2,3,4,8,9,21,22,23,27,29,31,40,41,42,50,51,53],
+};
+
+const QUESTS=[
+{id:'q1',name:'Bleak Falls',desc:'Encuentra la salida de Bleak Falls Barrow.',done:false,reward:{gold:80,xp:40}},
+{id:'q2',name:'Cazador de no-muertos',desc:'Derrota 6 esqueletos o draugr.',done:false,progress:0,goal:6,reward:{gold:120,xp:55,item:3}},
+{id:'q3',name:'La Voz',desc:'Aprende el grito Fus.',done:false,reward:{gold:50,xp:50}},
+{id:'q4',name:'Comerciante',desc:'Gasta o gana 200 septims en tiendas.',done:false,progress:0,goal:200,reward:{gold:50,xp:40,item:58}},
+{id:'q5',name:'Explorador de Skyrim',desc:'Visita Whiterun, Riften y una mazmorra.',done:false,progress:0,goal:3,reward:{gold:150,xp:70,item:4}},
+{id:'q6',name:'Gigante caído',desc:'Derrota a un gigante en el exterior.',done:false,reward:{gold:100,xp:60,item:6}},
+];
+
+// State
+let P={
+hp:100,maxHp:100,mag:50,maxMag:50,stam:90,maxStam:90,
+gold:75,level:1,xp:0,maxXp:100,maxWeight:150,
+mapId:'whiterun',x:7,y:12,dir:0,
+inv:[{id:20,q:1},{id:1,q:1},{id:40,q:3},{id:45,q:2},{id:30,q:1}],
+eq:{weapon:1,chest:20,head:null,feet:null,shield:30,ring:null,amulet:null},
+shouts:{fus:0},
+quests:JSON.parse(JSON.stringify(QUESTS)),
+kills:0,undead:0,shopSpent:0,
+visited:{},completedMaps:[],
+enemies:{},chests:{}, // runtime
+hour:10,
+};
+
+let combat=null, msgT=null, facingLoot=null;
+
+// Audio
+const SFX={
+ctx:null,m:null,on:true,vol:.4,ok:false,
+init(){if(this.ctx)return;try{this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.m=this.ctx.createGain();this.m.gain.value=1;this.m.connect(this.ctx.destination);}catch(e){}},
+unlock(){this.init();if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();this.ok=true;},
+tn(f,d,ty,v,w){if(!this.on||!this.ctx)return;const t=w||this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=ty||'square';o.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v*this.vol,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(this.m);o.start(t);o.stop(t+d+.02);},
+ns(d,v){if(!this.on||!this.ctx)return;const t=this.ctx.currentTime,n=Math.floor(this.ctx.sampleRate*d),b=this.ctx.createBuffer(1,n,this.ctx.sampleRate),data=b.getChannelData(0);for(let i=0;i<n;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(n*.3));const s=this.ctx.createBufferSource();s.buffer=b;const g=this.ctx.createGain();g.gain.value=v*this.vol;s.connect(g);g.connect(this.m);s.start(t);},
+step(){this.ns(.05,.12);this.tn(70+Math.random()*40,.04,'triangle',.07);},
+turn(){this.tn(180,.04,'triangle',.08);},
+hit(){this.ns(.1,.28);this.tn(90,.08,'sawtooth',.18);},
+hurt(){this.tn(150,.12,'sawtooth',.2);},
+win(){if(!this.ctx)return;const t=this.ctx.currentTime;[440,554,659].forEach((f,i)=>this.tn(f,.12,'triangle',.1,t+i*.09));},
+block(){this.tn(80,.05,'square',.12);},
+shout(){this.ns(.28,.32);this.tn(65,.3,'sawtooth',.22);},
+click(){this.tn(550,.03,'square',.08);},
+coin(){this.tn(800,.05,'sine',.1);this.tn(1100,.06,'sine',.08,this.ctx?this.ctx.currentTime+.05:0);},
+loot(){this.tn(300,.08,'triangle',.1);this.tn(500,.1,'triangle',.08,this.ctx?this.ctx.currentTime+.06:0);},
+};
+document.addEventListener('pointerdown',()=>SFX.unlock(),{once:true});
+
+function item(id){return ITEMS.find(i=>i.id===id);}
+function qty(id){const it=P.inv.find(i=>i.id===id);return it?it.q:0;}
+function addItem(id,q){q=q||1;const d=item(id);if(!d)return;if(d.stack){const e=P.inv.find(i=>i.id===id);if(e)e.q+=q;else P.inv.push({id,q});}else for(let i=0;i<q;i++)P.inv.push({id,q:1});}
+function remItem(id,q){q=q||1;const d=item(id);if(d&&d.stack){const it=P.inv.find(i=>i.id===id);if(!it||it.q<q)return false;it.q-=q;if(it.q<=0)P.inv=P.inv.filter(i=>i.id!==id);return true;}let r=0;P.inv=P.inv.filter(i=>{if(i.id===id&&r<q){r++;return false;}return true;});return r>=q;}
+function weight(){return P.inv.reduce((s,i)=>{const d=item(i.id);return s+(d?d.weight*(d.stack?i.q:1):0);},0);}
+function totalDef(){let d=0;for(const slot of Object.keys(P.eq)){const id=P.eq[slot];if(id){const it=item(id);if(it&&it.def)d+=it.def;}}return d;}
+function totalMagBonus(){let m=0;for(const slot of Object.keys(P.eq)){const id=P.eq[slot];if(id){const it=item(id);if(it&&it.magBonus)m+=it.magBonus;}}return m;}
+function cell(x,y){const m=MAPS[P.mapId];if(!m||y<0||y>=m.h||x<0||x>=m.w)return 1;return m.data[y][x];}
+function isWall(x,y){return solid(cell(x,y));}
+
+function initMapRuntime(){
+  const m=MAPS[P.mapId];if(!m)return;
+  P.enemies={};P.chests={};
+  (m.enemies||[]).forEach(e=>{P.enemies[e.x+','+e.y]={t:e.t,hp:EDEF[e.t].hp};});
+  (m.chests||[]).forEach(c=>{P.chests[c.x+','+c.y]={loot:c.loot,open:false};});
+  // also mark map cells with C
+  for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++)if(m.data[y][x]===4&&!P.chests[x+','+y])P.chests[x+','+y]={loot:[[40,.5],[45,.5],[52,.3]],open:false};
+}
+
+function loadMap(id,spawn){
+  const m=MAPS[id];if(!m)return;
+  P.mapId=id;
+  if(spawn){P.x=spawn.x;P.y=spawn.y;if(spawn.dir!=null)P.dir=spawn.dir;}
+  else{P.x=m.start.x;P.y=m.start.y;P.dir=m.start.dir;}
+  P.visited[id]=true;
+  initMapRuntime();
+  document.getElementById('locLabel').textContent=m.name;
+  combat=null;facingLoot=null;
+  applyTheme();
+  renderView();updateHUD();
+  log('Llegas a '+m.name+'.');
+}
+
+function applyTheme(){
+  const m=MAPS[P.mapId];const th=THEMES[m.theme]||THEMES.dungeon;
+  const ceil=document.getElementById('ceil'),floor=document.getElementById('floor');
+  const wL=document.getElementById('wallL'),wR=document.getElementById('wallR');
+  if(th.sky&&m.type==='wild'||m.type==='town'){
+    const h=P.hour;
+    let sky=th.sky;
+    if(h>=20||h<5)sky='assets/sky_night.png';
+    else if(h>=17)sky='assets/sky_dusk.png';
+    ceil.style.backgroundImage='url('+sky+')';
+  }else{
+    ceil.style.backgroundImage='url('+(th.ceil||'assets/ceil_dark.png')+')';
+  }
+  floor.style.backgroundImage='url('+th.floor+')';
+  wL.style.backgroundImage='url('+th.wall+')';
+  wR.style.backgroundImage='url('+th.wall+')';
+  for(let d=1;d<=3;d++){
+    const f=document.getElementById('front'+d);
+    f.style.backgroundImage='url('+th.wall+')';
+  }
+}
+
+function save(){try{localStorage.setItem('tamriel_df_v1',JSON.stringify(P));}catch(e){}}
+function load(){try{const r=localStorage.getItem('tamriel_df_v1');if(!r)return false;const p=JSON.parse(r);for(const k in P)if(p[k]===undefined)p[k]=P[k];if(!p.quests)p.quests=JSON.parse(JSON.stringify(QUESTS));if(!p.eq)p.eq=P.eq;P=p;return true;}catch(e){return false;}}
+
+function log(t){document.getElementById('logline').textContent=t;}
+function showMsg(t){const el=document.getElementById('fpMsg');el.textContent=t;el.classList.add('show');clearTimeout(msgT);msgT=setTimeout(()=>el.classList.remove('show'),1600);}
+function updateHUD(){
+  document.getElementById('barHp').style.width=Math.max(0,P.hp/P.maxHp*100)+'%';
+  document.getElementById('barMag').style.width=Math.max(0,P.mag/P.maxMag*100)+'%';
+  document.getElementById('barStam').style.width=Math.max(0,P.stam/P.maxStam*100)+'%';
+  document.getElementById('stLvl').textContent=P.level;
+  document.getElementById('stGold').textContent=P.gold;
+  document.getElementById('stWt').textContent=Math.floor(weight());
+  document.getElementById('stMaxWt').textContent=P.maxWeight;
+  const w=item(P.eq.weapon);document.getElementById('weaponImg').src=(w&&WPN_IMG[w.id])||'assets/sword.png';
+}
+function addXP(n){
+  P.xp+=n;log('+'+n+' XP');
+  while(P.xp>=P.maxXp){
+    P.xp-=P.maxXp;P.level++;P.maxXp=80+P.level*42;
+    P.maxHp+=12;P.hp=P.maxHp;P.maxMag+=6;P.mag=P.maxMag;P.maxStam+=5;P.stam=P.maxStam;
+    showMsg('¡Nivel '+P.level+'!');SFX.win();
+  }
+  updateHUD();
+}
+
+// View
+function ahead(d){return{x:P.x+DX[P.dir]*d,y:P.y+DY[P.dir]*d};}
+function leftD(){return(P.dir+3)%4;}function rightD(){return(P.dir+1)%4;}
+
+function renderView(){
+  const m=MAPS[P.mapId];const th=THEMES[m.theme]||THEMES.dungeon;
+  for(let d=1;d<=3;d++){
+    const p=ahead(d),el=document.getElementById('front'+d);
+    if(isWall(p.x,p.y)){el.classList.remove('hidden','open');el.className='fp-front d'+d;el.style.backgroundImage='url('+th.wall+')';}
+    else{
+      if(d===1){el.classList.remove('hidden');el.className='fp-front d1 open';}
+      else{
+        // show wall if blocked further, else open tunnel look
+        const further=ahead(d);
+        if(isWall(further.x,further.y)){el.classList.remove('hidden','open');el.className='fp-front d'+d;el.style.backgroundImage='url('+th.wall+')';}
+        else{el.className='fp-front d'+d+' open';el.classList.remove('hidden');}
+      }
+    }
+  }
+  const a1=ahead(1);
+  if(!isWall(a1.x,a1.y)){
+    document.getElementById('front1').className='fp-front d1 open';
+    const a2=ahead(2),f2=document.getElementById('front2');
+    if(isWall(a2.x,a2.y)){f2.classList.remove('hidden');f2.className='fp-front d2';f2.style.backgroundImage='url('+th.wall+')';document.getElementById('front3').classList.add('hidden');}
+    else{f2.className='fp-front d2 open';f2.classList.remove('hidden');
+      const a3=ahead(3),f3=document.getElementById('front3');
+      if(isWall(a3.x,a3.y)){f3.classList.remove('hidden');f3.className='fp-front d3';f3.style.backgroundImage='url('+th.wall+')';}
+      else{f3.className='fp-front d3 open';f3.classList.remove('hidden');}
+    }
+  }
+  const ln={x:P.x+DX[leftD()],y:P.y+DY[leftD()]},rn={x:P.x+DX[rightD()],y:P.y+DY[rightD()]};
+  document.getElementById('sideL').classList.toggle('hidden',isWall(ln.x,ln.y));
+  document.getElementById('sideR').classList.toggle('hidden',isWall(rn.x,rn.y));
+  document.getElementById('wallL').style.opacity=isWall(ln.x,ln.y)?'1':'.65';
+  document.getElementById('wallR').style.opacity=isWall(rn.x,rn.y)?'1':'.65';
+  document.getElementById('compass').textContent=DN[P.dir];
+
+  // Enemy LOS
+  const eImg=document.getElementById('enemyImg');
+  let found=null,fdist=0;
+  for(let d=1;d<=3;d++){
+    const p=ahead(d);if(isWall(p.x,p.y))break;
+    const k=p.x+','+p.y;
+    if(P.enemies[k]&&P.enemies[k].hp>0){found={key:k,...P.enemies[k]};fdist=d;break;}
+  }
+  if(found){
+    const def=EDEF[found.t];
+    eImg.src=def.img;eImg.className='fp-enemy '+(fdist===1?'near':fdist===2?'mid':'far');eImg.classList.remove('hidden');
+    if(fdist===1)combat={key:found.key,t:found.t,hp:found.hp,max:def.hp};
+    else combat=null;
+  }else{eImg.classList.add('hidden');combat=null;}
+
+  // Loot in front
+  const lootImg=document.getElementById('lootImg');
+  facingLoot=null;
+  const f1=ahead(1);
+  if(!isWall(f1.x,f1.y)){
+    const ck=f1.x+','+f1.y;
+    if(P.chests[ck]&&!P.chests[ck].open){facingLoot={type:'chest',key:ck};lootImg.classList.remove('hidden');}
+    else if(P.enemies[ck]&&P.enemies[ck].hp<=0&&P.enemies[ck].corpse){facingLoot={type:'corpse',key:ck};lootImg.classList.remove('hidden');}
+    else lootImg.classList.add('hidden');
+  }else lootImg.classList.add('hidden');
+
+  document.getElementById('btnAtk').disabled=!combat;
+  document.getElementById('btnShout').disabled=!combat||P.shouts.fus<1||P.mag<15;
+  document.getElementById('btnShout').textContent=P.shouts.fus>=1?['','Fus','Fus Ro','Fus Ro Dah'][P.shouts.fus]:'Grito';
+  document.getElementById('btnLoot').disabled=!facingLoot;
+}
+
+// Movement
+function turnL(){if(panelOpen())return;SFX.turn();SFX.unlock();P.dir=leftD();renderView();save();}
+function turnR(){if(panelOpen())return;SFX.turn();SFX.unlock();P.dir=rightD();renderView();save();}
+function moveFwd(){
+  if(panelOpen())return;SFX.unlock();
+  if(combat){log('¡Enemigo bloquea el paso!');return;}
+  if(weight()>P.maxWeight){log('Demasiado peso. No puedes moverte.');showMsg('Sobrecarga');return;}
+  const nx=P.x+DX[P.dir],ny=P.y+DY[P.dir],c=cell(nx,ny);
+  if(solid(c)){SFX.block();showMsg('Pared');return;}
+  SFX.step();P.x=nx;P.y=ny;P.stam=Math.max(0,P.stam-1);P.hour=(P.hour+Math.random()<.15?1:0)%24;
+  // special cells
+  if(c===2||c===5){onDoor(c);return;}
+  if(c===3){log('Estás frente a una tienda. Pulsa Tienda.');}
+  // random outdoor encounter already placed as enemies
+  if(Math.random()<.04&&MAPS[P.mapId].type==='wild'){
+    const gold=1+Math.floor(Math.random()*8);P.gold+=gold;showMsg('+'+gold+'🪙');
+  }
+  if(P.shouts.fus<1&&MAPS[P.mapId].type==='dungeon'&&Math.random()<.035){
+    P.shouts.fus=1;showMsg('¡Aprendes: Fus!');SFX.shout();completeQuest('q3');
+  }
+  applyTheme();renderView();updateHUD();save();
+}
+function moveBack(){
+  if(panelOpen())return;SFX.unlock();
+  if(combat){log('No puedes huir así.');return;}
+  const b=(P.dir+2)%4,nx=P.x+DX[b],ny=P.y+DY[b];
+  if(isWall(nx,ny)){SFX.block();showMsg('Pared');return;}
+  SFX.step();P.x=nx;P.y=ny;renderView();updateHUD();save();
+}
+function onDoor(c){
+  const m=MAPS[P.mapId];
+  SFX.win();showMsg(c===5?'Salida':'Puerta');
+  // Transitions
+  if(P.mapId==='whiterun'&&c===5){loadMap('wilderness',{x:16,y:10,dir:2});return;}
+  if(P.mapId==='wilderness'&&c===5){loadMap('whiterun',{x:7,y:11,dir:0});return;}
+  if(P.mapId==='wilderness'&&c===2){loadMap('bleakfalls');if(!P.completedMaps.includes('wilderness')){/*no*/}return;}
+  if(P.mapId==='bleakfalls'&&c===2){
+    if(!P.completedMaps.includes('bleakfalls')){P.completedMaps.push('bleakfalls');addXP(45);P.gold+=40;completeQuest('q1');trackExplore();}
+    loadMap('wilderness',{x:17,y:13,dir:3});return;
+  }
+  if(P.mapId==='crypt'&&c===2){
+    if(!P.completedMaps.includes('crypt')){P.completedMaps.push('crypt');addXP(50);P.gold+=50;trackExplore();}
+    loadMap('whiterun',{x:1,y:5,dir:1});return;
+  }
+  if(P.mapId==='forest_cave'&&c===2){
+    if(!P.completedMaps.includes('forest_cave')){P.completedMaps.push('forest_cave');addXP(40);P.gold+=35;trackExplore();}
+    loadMap('wilderness',{x:2,y:7,dir:1});return;
+  }
+  if(P.mapId==='riften'&&c===2){loadMap('wilderness',{x:10,y:1,dir:2});return;}
+  // default: next dungeon or town
+  loadMap('whiterun');
+}
+function trackExplore(){
+  const q=P.quests.find(x=>x.id==='q5');
+  if(q&&!q.done){q.progress=Object.keys(P.visited).length;if(q.progress>=q.goal)completeQuest('q5');}
+}
+
+// Combat
+function doAttack(){
+  if(!combat)return;SFX.hit();SFX.unlock();
+  const w=item(P.eq.weapon)||{dmg:3,name:'puños'};
+  const dmg=Math.max(1,w.dmg+Math.floor(Math.random()*4)-1);
+  combat.hp-=dmg;P.enemies[combat.key].hp=combat.hp;P.stam=Math.max(0,P.stam-3);
+  document.getElementById('enemyImg').classList.add('hit');
+  document.getElementById('weaponImg').classList.add('swing');
+  setTimeout(()=>{document.getElementById('enemyImg').classList.remove('hit');document.getElementById('weaponImg').classList.remove('swing');},140);
+  showMsg('-'+dmg);log(w.name+': -'+dmg+' a '+EDEF[combat.t].name);
+  if(combat.hp<=0){onKill();return;}
+  setTimeout(enemyHit,380);updateHUD();save();
+}
+function doShout(){
+  if(!combat||P.shouts.fus<1||P.mag<15)return;SFX.shout();
+  const pwr=P.shouts.fus,dmg=12+pwr*10+Math.floor(Math.random()*8);
+  P.mag-=12+pwr*4;combat.hp-=dmg;P.enemies[combat.key].hp=combat.hp;
+  showMsg(['','Fus!','Fus Ro!','Fus Ro Dah!'][pwr]);
+  document.getElementById('enemyImg').classList.add('hit');
+  setTimeout(()=>document.getElementById('enemyImg').classList.remove('hit'),180);
+  if(combat.hp<=0){onKill();return;}
+  setTimeout(enemyHit,420);updateHUD();renderView();save();
+}
+function enemyHit(){
+  if(!combat||combat.hp<=0)return;
+  const def=EDEF[combat.t],red=Math.floor(totalDef()/4);
+  const dmg=Math.max(1,def.dmg-red+Math.floor(Math.random()*3));
+  P.hp-=dmg;SFX.hurt();showMsg('-'+dmg+'❤');log(def.name+' te golpea (-'+dmg+')');
+  if(P.hp<=0){
+    P.hp=0;updateHUD();log('Caes... Despiertas herido.');showMsg('Derrota');
+    setTimeout(()=>{P.hp=Math.floor(P.maxHp*.35);P.gold=Math.max(0,P.gold-Math.floor(P.gold*.08));loadMap(P.mapId);save();},1100);
+    return;
+  }
+  updateHUD();save();
+}
+function onKill(){
+  const def=EDEF[combat.t],t=combat.t,key=combat.key;
+  P.enemies[key]={t,hp:0,corpse:true,looted:false,loot:def.loot};
+  combat=null;SFX.win();
+  const gold=def.gold[0]+Math.floor(Math.random()*(def.gold[1]-def.gold[0]+1));
+  P.gold+=gold;addXP(def.xp);P.kills++;
+  if((def.tags||[]).includes('undead')){
+    P.undead++;const q=P.quests.find(x=>x.id==='q2');
+    if(q&&!q.done){q.progress=P.undead;if(q.progress>=q.goal)completeQuest('q2');}
+  }
+  if(t==='giant')completeQuest('q6');
+  log('Derrotas a '+def.name+'. +'+gold+'🪙');showMsg(def.name+' cae');
+  if(P.shouts.fus<3&&Math.random()<.1){P.shouts.fus=Math.min(3,P.shouts.fus+1);showMsg('¡Nuevo grito!');SFX.shout();if(P.shouts.fus===1)completeQuest('q3');}
+  renderView();updateHUD();save();
+}
+
+// Loot
+function doLoot(){
+  if(!facingLoot)return;SFX.loot();SFX.unlock();
+  if(facingLoot.type==='chest'){
+    const ch=P.chests[facingLoot.key];if(!ch||ch.open)return;
+    ch.open=true;let got=false;
+    (ch.loot||[]).forEach(([id,chance])=>{
+      if(Math.random()<chance){addItem(id);log('Botín: '+item(id).name);got=true;}
+    });
+    const g=5+Math.floor(Math.random()*25);P.gold+=g;log('+'+g+' septims del cofre');
+    if(!got)log('El cofre tenía poco de valor.');
+    showMsg('Cofre abierto');
+  }else if(facingLoot.type==='corpse'){
+    const e=P.enemies[facingLoot.key];if(!e||e.looted)return;
+    e.looted=true;let got=false;
+    (e.loot||[]).forEach(([id,chance])=>{
+      if(Math.random()<chance){addItem(id);log('Saqueas: '+item(id).name);got=true;}
+    });
+    if(!got){const g=1+Math.floor(Math.random()*6);P.gold+=g;log('+'+g+'🪙 del cadáver');}
+    showMsg('Saqueado');
+  }
+  facingLoot=null;updateHUD();renderView();save();
+}
+
+// Shop
+function tryShop(){
+  const m=MAPS[P.mapId];
+  if(!m||m.type!=='town'){log('No hay tiendas aquí.');return;}
+  // must be near shop cell or any town
+  openShop();
+}
+function openShop(){
+  SFX.click();
+  const stock=SHOPS[P.mapId]||SHOPS.whiterun;
+  let html='<h3>Comerciante</h3><p class="small center">🪙 '+P.gold+' — Peso '+Math.floor(weight())+'/'+P.maxWeight+'</p>';
+  html+='<p class="small">Comprar</p>';
+  stock.forEach(id=>{
+    const d=item(id);if(!d)return;
+    html+='<div class="shop-row"><span>'+d.name+' <span class="small">('+d.value+'🪙)</span></span><button onclick="buy('+id+')">Comprar</button></div>';
+  });
+  html+='<p class="small" style="margin-top:10px">Vender (40% valor)</p>';
+  const seen={};
+  P.inv.forEach(it=>{
+    if(seen[it.id])return;seen[it.id]=true;
+    const d=item(it.id);if(!d)return;
+    const sell=Math.max(1,Math.floor(d.value*.4));
+    const q=d.stack?qty(it.id):1;
+    const eqd=Object.values(P.eq).includes(it.id);
+    html+='<div class="shop-row"><span>'+d.name+(q>1?' ×'+q:'')+(eqd?' ★':'')+' <span class="small">('+sell+'🪙)</span></span><button onclick="sell('+it.id+','+sell+')" '+(eqd?'disabled':'')+'>Vender</button></div>';
+  });
+  html+='<button onclick="closeModal()">Cerrar</button>';
+  document.getElementById('modalContent').innerHTML=html;
+  document.getElementById('modal').classList.remove('hidden');
+}
+function buy(id){
+  const d=item(id);if(!d)return;
+  if(P.gold<d.value){log('No tienes septims.');return;}
+  if(weight()+d.weight>P.maxWeight+5){log('Demasiado peso.');return;}
+  P.gold-=d.value;addItem(id);P.shopSpent+=d.value;SFX.coin();
+  log('Compras: '+d.name);showMsg(d.name);
+  const q=P.quests.find(x=>x.id==='q4');if(q&&!q.done){q.progress=P.shopSpent;if(q.progress>=q.goal)completeQuest('q4');}
+  updateHUD();save();openShop();
+}
+function sell(id,price){
+  if(Object.values(P.eq).includes(id)){log('No puedes vender lo equipado.');return;}
+  if(!remItem(id,1))return;
+  P.gold+=price;P.shopSpent+=price;SFX.coin();log('Vendes por '+price+'🪙');
+  const q=P.quests.find(x=>x.id==='q4');if(q&&!q.done){q.progress=P.shopSpent;if(q.progress>=q.goal)completeQuest('q4');}
+  updateHUD();save();openShop();
+}
+
+function completeQuest(id){
+  const q=P.quests.find(x=>x.id===id);if(!q||q.done)return;
+  q.done=true;
+  if(q.reward.gold)P.gold+=q.reward.gold;
+  if(q.reward.xp)addXP(q.reward.xp);
+  if(q.reward.item){addItem(q.reward.item);log('Recompensa: '+item(q.reward.item).name);}
+  log('¡Misión: '+q.name+'!');showMsg('Misión completada');SFX.win();save();updateHUD();
+}
+
+// Panels
+function panelOpen(){return document.getElementById('panel').classList.contains('open');}
+function openPanel(t){
+  SFX.click();
+  const pan=document.getElementById('panel'),vp=document.getElementById('viewport');
+  if(pan.classList.contains('open')&&pan.dataset.t===t){closePanel();return;}
+  pan.dataset.t=t;pan.classList.add('open');vp.classList.add('hid');
+  if(t==='inv')renderInv();
+  else if(t==='char')renderChar();
+  else if(t==='quests')renderQuests();
+  else if(t==='travel')renderTravel();
+}
+function closePanel(){document.getElementById('panel').classList.remove('open');document.getElementById('viewport').classList.remove('hid');renderView();}
+
+function renderInv(){
+  let h='<div class="tabs"><button class="on">Inventario</button><button onclick="closePanel()">✕</button></div>';
+  h+='<p class="small">Peso '+Math.floor(weight())+'/'+P.maxWeight+' — Def total: '+totalDef()+' — Mag +'+totalMagBonus()+'</p>';
+  const slots=[['weapon','Arma'],['shield','Escudo'],['head','Cabeza'],['chest','Pecho'],['feet','Pies'],['ring','Anillo'],['amulet','Amuleto']];
+  h+='<div class="slot">Equipado</div>';
+  slots.forEach(([s,n])=>{
+    const id=P.eq[s];const d=id?item(id):null;
+    h+='<div class="item"><div class="n">'+n+': '+(d?d.name:'—')+'</div>';
+    if(d)h+='<button onclick="unequip(\''+s+'\')">Quitar</button>';
+    h+='</div>';
+  });
+  h+='<div class="slot">Mochila</div>';
+  const seen={};
+  P.inv.forEach(it=>{
+    const d=item(it.id);if(!d)return;
+    if(seen[it.id]&&d.stack)return;seen[it.id]=true;
+    const q=d.stack?qty(it.id):1;
+    const equipped=Object.values(P.eq).includes(it.id);
+    h+='<div class="item"><div class="n">'+d.name+(q>1?' ×'+q:'')+(equipped?' ★':'')+'</div>';
+    h+='<div class="m">'+(d.dmg?d.dmg+' dmg ': '')+(d.def?d.def+' def ':'')+(d.heal?'+'+d.heal+'❤ ':'')+d.value+'🪙 '+d.weight+'u</div><div>';
+    if(d.slot&&!equipped)h+='<button class="eq" onclick="equip('+it.id+',\''+d.slot+'\')">Equipar</button> ';
+    if(d.type==='potion'||d.type==='food')h+='<button onclick="useItem('+it.id+')">Usar</button> ';
+    if(!equipped)h+='<button onclick="dropItem('+it.id+')">Tirar</button>';
+    h+='</div></div>';
+  });
+  document.getElementById('panel').innerHTML=h;
+}
+function equip(id,slot){
+  // free old
+  const old=P.eq[slot];
+  P.eq[slot]=id;
+  // ensure in inv
+  if(!P.inv.some(i=>i.id===id))addItem(id);
+  log('Equipas: '+item(id).name);SFX.click();save();renderInv();updateHUD();
+}
+function unequip(slot){
+  if(!P.eq[slot])return;
+  // keep in inv
+  P.eq[slot]=null;SFX.click();save();renderInv();updateHUD();
+}
+function useItem(id){
+  const d=item(id);if(!d||qty(id)<1)return;
+  if(d.heal){P.hp=Math.min(P.maxHp,P.hp+d.heal);log('+'+d.heal+' salud');}
+  if(d.mag){P.mag=Math.min(P.maxMag+totalMagBonus(),P.mag+d.mag);log('+'+d.mag+' magia');}
+  if(d.stam){P.stam=Math.min(P.maxStam,P.stam+d.stam);log('+'+d.stam+' aguante');}
+  remItem(id,1);SFX.click();updateHUD();save();renderInv();
+}
+function dropItem(id){
+  if(Object.values(P.eq).includes(id)){log('No puedes tirar lo equipado.');return;}
+  remItem(id,1);log('Tiras: '+item(id).name);save();renderInv();updateHUD();
+}
+
+function renderChar(){
+  const w=item(P.eq.weapon),c=item(P.eq.chest);
+  const sh=['Ninguno','Fus','Fus Ro','Fus Ro Dah'][P.shouts.fus]||'Ninguno';
+  document.getElementById('panel').innerHTML=`
+  <div class="tabs"><button class="on">Personaje</button><button onclick="closePanel()">✕</button></div>
+  <div class="center" style="color:var(--gold);font-size:15px;margin:6px 0">Sangre de Dragón</div>
+  <div class="small center">Nivel ${P.level} — XP ${P.xp}/${P.maxXp} — Hora ${P.hour}:00</div>
+  <div style="font-size:12px;margin:10px 0;line-height:1.65">
+  ❤ ${Math.floor(P.hp)}/${P.maxHp} · ✦ ${Math.floor(P.mag)}/${P.maxMag} · ⚡ ${Math.floor(P.stam)}/${P.maxStam}<br>
+  🪙 ${P.gold} · Peso ${Math.floor(weight())}/${P.maxWeight}<br>
+  Defensa: ${totalDef()} · Magia extra: +${totalMagBonus()}<br>
+  ⚔ Bajas: ${P.kills} · No-muertos: ${P.undead}<br>
+  Arma: ${w?w.name:'—'} · Armadura: ${c?c.name:'—'}<br>
+  Grito: ${sh}<br>
+  Mapas: ${Object.keys(P.visited).join(', ')||'—'}
+  </div>
+  <button onclick="closePanel()" style="width:100%;padding:10px;background:#2a2015;border:1px solid #5a4520;color:var(--txt);font-family:inherit;border-radius:3px">Cerrar</button>`;
+}
+function renderQuests(){
+  let h='<div class="tabs"><button class="on">Misiones</button><button onclick="closePanel()">✕</button></div>';
+  P.quests.forEach(q=>{
+    if(q.done)h+='<div class="qcard" style="opacity:.55"><h4>✓ '+q.name+'</h4></div>';
+    else{const p=q.goal?' ('+(q.progress||0)+'/'+q.goal+')':'';h+='<div class="qcard"><h4>'+q.name+p+'</h4><p>'+q.desc+'</p></div>';}
+  });
+  document.getElementById('panel').innerHTML=h;
+}
+function renderTravel(){
+  let h='<div class="tabs"><button class="on">Viajar</button><button onclick="closePanel()">✕</button></div>';
+  h+='<p class="small center">Viaje rápido (reinicia enemigos del mapa)</p>';
+  const places=[
+    ['whiterun','Whiterun (ciudad)'],
+    ['riften','Riften (ciudad)'],
+    ['wilderness','Tierras de Whiterun'],
+    ['bleakfalls','Bleak Falls Barrow'],
+    ['crypt','Cripta de los Ancestros'],
+    ['forest_cave','Cueva del Bosque'],
+  ];
+  places.forEach(([id,name])=>{
+    const done=P.completedMaps.includes(id)?' ✓':'';
+    h+='<button onclick="loadMap(\''+id+'\');closePanel();save()" style="width:100%;margin:3px 0;padding:10px;background:#2a2015;border:1px solid #5a4520;color:var(--txt);font-family:inherit;border-radius:3px;cursor:pointer">'+name+done+'</button>';
+  });
+  document.getElementById('panel').innerHTML=h;
+}
+
+function openSettings(){
+  SFX.click();
+  document.getElementById('modalContent').innerHTML=`
+  <h3>Opciones</h3>
+  <p class="small center">Tamriel · Estilo Daggerfall</p>
+  <button onclick="save();log('Guardado');closeModal()">Guardar</button>
+  <button onclick="if(load()){initMapRuntime();applyTheme();renderView();updateHUD();log('Cargado');}closeModal()">Cargar</button>
+  <button onclick="SFX.on=!SFX.on;this.textContent='Sonido: '+(SFX.on?'ON':'OFF')">Sonido: ${SFX.on?'ON':'OFF'}</button>
+  <button class="danger" onclick="if(confirm('¿Borrar partida?')){localStorage.removeItem('tamriel_df_v1');location.reload()}">Borrar partida</button>
+  <button onclick="closeModal()">Cerrar</button>`;
+  document.getElementById('modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('modal').classList.add('hidden');}
+
+document.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  switch(e.key){
+    case 'ArrowUp':case 'w':case 'W':moveFwd();break;
+    case 'ArrowDown':case 's':case 'S':moveBack();break;
+    case 'ArrowLeft':case 'a':case 'A':turnL();break;
+    case 'ArrowRight':case 'd':case 'D':turnR();break;
+    case ' ':case 'Enter':if(combat)doAttack();else if(facingLoot)doLoot();break;
+    case 'q':case 'Q':if(combat)doShout();break;
+    case 'e':case 'E':if(facingLoot)doLoot();break;
+    case 'Escape':closePanel();closeModal();break;
+  }
+});
+
+// Init
+if(!load()){loadMap('whiterun');}
+else{initMapRuntime();document.getElementById('locLabel').textContent=MAPS[P.mapId]?MAPS[P.mapId].name:P.mapId;applyTheme();renderView();updateHUD();log('Partida restaurada.');}
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
